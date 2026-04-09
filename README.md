@@ -252,6 +252,7 @@ Connect nanobot to your favorite chat platform. Want to build your own? See the 
 | **Matrix** | Homeserver URL + Access token |
 | **Email** | IMAP/SMTP credentials |
 | **QQ** | App ID + App Secret |
+| **OneBot v11** | OneBot endpoint (NapCat/LLOneBot/go-cqhttp), supports forward/reverse WebSocket |
 | **Wecom** | Bot ID + Bot Secret |
 | **Mochat** | Claw token (auto-setup available) |
 
