@@ -15,9 +15,12 @@ from loguru import logger
 
 
 def strip_think(text: str) -> str:
-    """Remove <think>…</think> blocks and any unclosed trailing <think> tag."""
+    """Remove thinking blocks and any unclosed trailing tag."""
     text = re.sub(r"<think>[\s\S]*?</think>", "", text)
-    text = re.sub(r"<think>[\s\S]*$", "", text)
+    text = re.sub(r"^\s*<think>[\s\S]*$", "", text)
+    # Gemma 4 and similar models use <thought>...</thought> blocks
+    text = re.sub(r"<thought>[\s\S]*?</thought>", "", text)
+    text = re.sub(r"^\s*<thought>[\s\S]*$", "", text)
     return text.strip()
 
 
@@ -397,6 +400,7 @@ def build_status_content(
     session_msg_count: int,
     context_tokens_estimate: int,
     search_usage_text: str | None = None,
+    active_task_count: int = 0,
 ) -> str:
     """Build a human-readable runtime status snapshot.
     
@@ -428,6 +432,7 @@ def build_status_content(
         f"\U0001f4da Context: {ctx_used_str}/{ctx_total_str} ({ctx_pct}%)",
         f"\U0001f4ac Session: {session_msg_count} messages",
         f"\u23f1 Uptime: {uptime}",
+        f"\u26a1 Tasks: {active_task_count} active",
     ]
     if search_usage_text:
         lines.append(search_usage_text)

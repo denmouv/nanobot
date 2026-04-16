@@ -16,10 +16,6 @@ _STRIP_SKILL_FRONTMATTER = re.compile(
 )
 
 
-def _escape_xml(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
 class SkillsLoader:
     """
     Loader for agent skills.
@@ -28,10 +24,11 @@ class SkillsLoader:
     specific tools or perform certain tasks.
     """
 
-    def __init__(self, workspace: Path, builtin_skills_dir: Path | None = None):
+    def __init__(self, workspace: Path, builtin_skills_dir: Path | None = None, disabled_skills: set[str] | None = None):
         self.workspace = workspace
         self.workspace_skills = workspace / "skills"
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
+        self.disabled_skills = disabled_skills or set()
 
     def _skill_entries_from_dir(self, base: Path, source: str, *, skip_names: set[str] | None = None) -> list[dict[str, str]]:
         if not base.exists():
@@ -65,6 +62,9 @@ class SkillsLoader:
             skills.extend(
                 self._skill_entries_from_dir(self.builtin_skills, "builtin", skip_names=workspace_names)
             )
+
+        if self.disabled_skills:
+            skills = [s for s in skills if s["name"] not in self.disabled_skills]
 
         if filter_unavailable:
             return [skill for skill in skills if self._check_requirements(self._get_skill_meta(skill["name"]))]
@@ -106,39 +106,37 @@ class SkillsLoader:
         ]
         return "\n\n---\n\n".join(parts)
 
-    def build_skills_summary(self) -> str:
+    def build_skills_summary(self, exclude: set[str] | None = None) -> str:
         """
         Build a summary of all skills (name, description, path, availability).
 
         This is used for progressive loading - the agent can read the full
         skill content using read_file when needed.
 
+        Args:
+            exclude: Set of skill names to omit from the summary.
+
         Returns:
-            XML-formatted skills summary.
+            Markdown-formatted skills summary.
         """
         all_skills = self.list_skills(filter_unavailable=False)
         if not all_skills:
             return ""
 
-        lines: list[str] = ["<skills>"]
+        lines: list[str] = []
         for entry in all_skills:
             skill_name = entry["name"]
+            if exclude and skill_name in exclude:
+                continue
             meta = self._get_skill_meta(skill_name)
             available = self._check_requirements(meta)
-            lines.extend(
-                [
-                    f'  <skill available="{str(available).lower()}">',
-                    f"    <name>{_escape_xml(skill_name)}</name>",
-                    f"    <description>{_escape_xml(self._get_skill_description(skill_name))}</description>",
-                    f"    <location>{entry['path']}</location>",
-                ]
-            )
-            if not available:
+            desc = self._get_skill_description(skill_name)
+            if available:
+                lines.append(f"- **{skill_name}** — {desc}  `{entry['path']}`")
+            else:
                 missing = self._get_missing_requirements(meta)
-                if missing:
-                    lines.append(f"    <requires>{_escape_xml(missing)}</requires>")
-            lines.append("  </skill>")
-        lines.append("</skills>")
+                suffix = f" (unavailable: {missing})" if missing else " (unavailable)"
+                lines.append(f"- **{skill_name}** — {desc}{suffix}  `{entry['path']}`")
         return "\n".join(lines)
 
     def _get_missing_requirements(self, skill_meta: dict) -> str:
